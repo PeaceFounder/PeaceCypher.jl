@@ -20,3 +20,7 @@ io = IOBuffer()
 secureio = cypher.secureio(io,24235235)
 write(secureio,b"hello")
 take!(io)
+
+@show notary.Signature(Dict(signature)) == signature
+@show notary.Signer(Dict(signer)) == signer
+

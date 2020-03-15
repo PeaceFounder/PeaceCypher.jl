@@ -30,6 +30,8 @@ function Notary(::Type{ThisCypherSuite},config::Symbol)
     hash(x::AbstractString) = parse(BigInt,Nettle.hexdigest("sha256",x),base=16)
 
     Signer() = CryptoSignatures.Signer(G)
+    Signer(x::Dict) = CryptoSignatures.Signer{BigInt}(x,G)
+    Signature(x::Dict) = CryptoSignatures.DSASignature{BigInt}(x)
     Signature(x::AbstractString,signer) = CryptoSignatures.DSASignature(hash(x),signer)
     verify(data,signature) = CryptoSignatures.verify(signature,G) && hash(data)==signature.hash ? hash("$(signature.pubkey)") : nothing
 
