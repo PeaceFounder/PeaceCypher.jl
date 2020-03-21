@@ -14,6 +14,7 @@ SecureIO = "ee77041e-65ec-469d-b516-892ca52996d6"
 [compat]
 CryptoGroups = "^0.1.2"
 CryptoSignatures = "^0.2.2"
+PeaceVote = "^0.2.3"
 Nettle = "^0.4.0"
 SecureIO = "^0.3.0"
 julia = "1"
