@@ -2,7 +2,7 @@ module PeaceCypher
 
 ### This is a place of cryptographic definitions for Notary and Cypher. 
 using PeaceVote: CypherSuite
-import PeaceVote: Notary, Cypher
+import PeaceVote: Notary, Cypher, ID
 
 using Random
 using CryptoGroups
@@ -33,7 +33,7 @@ function Notary(::Type{ThisCypherSuite},config::Symbol)
     Signer(x::Dict) = CryptoSignatures.Signer{BigInt}(x,G)
     Signature(x::Dict) = CryptoSignatures.DSASignature{BigInt}(x)
     Signature(x::AbstractString,signer) = CryptoSignatures.DSASignature(hash(x),signer)
-    verify(data,signature) = CryptoSignatures.verify(signature,G) && hash(data)==signature.hash ? hash("$(signature.pubkey)") : nothing
+    verify(data,signature) = CryptoSignatures.verify(signature,G) && hash(data)==signature.hash ? ID(hash("$(signature.pubkey)")) : nothing
 
     return Notary(Signer,Signature,verify,hash)
 end
