@@ -1,9 +1,10 @@
 using PeaceCypher
-using PeaceVote
+using PeaceVote.DemeNet.Plugins: uuid
+using PeaceVote.DemeNet: CypherSuite, Notary
 
-uuid = PeaceVote.uuid(:PeaceCypher)
+cypher = uuid(:PeaceCypher)
 
-notary = Notary(CypherSuite(uuid),:default)
+notary = Notary(CypherSuite(cypher),:default)
 
 signer = notary.Signer()
 
@@ -11,7 +12,7 @@ msg = "Hello World"
 signature = notary.Signature(msg,signer)
 @show notary.verify(msg,signature)
 
-cypher = Cypher(CypherSuite(uuid),:default)
+cypher = Cypher(CypherSuite(cypher),:default)
 
 @show cypher.G
 @show cypher.rng()
