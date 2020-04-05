@@ -46,6 +46,12 @@ uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 deps = ["Mmap"]
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
+[[DemeNet]]
+deps = ["Pkg"]
+git-tree-sha1 = "7764bc355c32046406ac98b17e67e5e720f7a041"
+uuid = "311d44f8-95d5-40c8-b71c-a916d7747227"
+version = "0.1.0"
+
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"

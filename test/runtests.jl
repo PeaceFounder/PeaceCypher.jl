@@ -1,6 +1,6 @@
 using PeaceCypher
-using PeaceVote.DemeNet.Plugins: uuid
-using PeaceVote.DemeNet: CypherSuite, Notary
+using DemeNet.Plugins: uuid
+using DemeNet: CypherSuite, Notary
 
 cypher = uuid(:PeaceCypher)
 

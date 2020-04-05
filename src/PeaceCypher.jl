@@ -1,8 +1,8 @@
 module PeaceCypher
 
 ### This is a place of cryptographic definitions for Notary and Cypher. 
-using PeaceVote.DemeNet: CypherSuite, ID
-import PeaceVote.DemeNet: Notary, Cypher
+using DemeNet: CypherSuite, ID
+import DemeNet: Notary, Cypher
 
 using Random
 using CryptoGroups
