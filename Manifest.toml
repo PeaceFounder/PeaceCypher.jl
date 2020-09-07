@@ -46,11 +46,11 @@ uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 deps = ["Mmap"]
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
-[[DemeNet]]
-deps = ["Pkg"]
-git-tree-sha1 = "7764bc355c32046406ac98b17e67e5e720f7a041"
-uuid = "311d44f8-95d5-40c8-b71c-a916d7747227"
-version = "0.1.0"
+[[DiffieHellman]]
+deps = ["CryptoGroups"]
+git-tree-sha1 = "a16ae95af764fa991b031504824b40ce21551a08"
+uuid = "0e61fee8-20a4-4374-8233-5198f28d9d66"
+version = "0.4.0"
 
 [[Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -104,12 +104,6 @@ deps = ["Polynomials", "Primes", "Random"]
 git-tree-sha1 = "4da59ccc00548b8765b74909f7be4be998eab061"
 uuid = "84e01822-a062-59e4-8289-aa032edeecdd"
 version = "0.2.4"
-
-[[PeaceVote]]
-deps = ["Pkg"]
-git-tree-sha1 = "5a39d258f33c11a4a755b0bd6bb505fecd9aa2fa"
-uuid = "129db535-0459-46ad-8d3d-b1fb8f318c74"
-version = "0.2.7"
 
 [[Pkg]]
 deps = ["Dates", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]

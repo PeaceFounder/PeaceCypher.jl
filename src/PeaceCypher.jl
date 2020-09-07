@@ -1,17 +1,94 @@
 module PeaceCypher
 
-### This is a place of cryptographic definitions for Notary and Cypher. 
-using DemeNet: CypherSuite, ID
-import DemeNet: Notary, Cypher
-
 using Random
 using CryptoGroups
 using CryptoSignatures
+using DiffieHellman
 using SecureIO
 using Nettle
+using Pkg.TOML
+
+struct Notary
+    G::AbstractGroup
+end
+
+const Key = CryptoSignatures.Signer
+
+struct Signer
+    notary::Notary
+    key::Key
+end
+
+Notary() = Notary(CryptoGroups.Scep256k1Group())
+
+hash(x::AbstractString, crypto::Notary) = BigInt(Base.hash(x))
+hash(x, crypto::Notary) = hash(string(x), crypto)
 
 
-ThisCypherSuite = CypherSuite(@__MODULE__)
+newsigner(crypto::Notary) = Signer(crypto,Key(crypto.G))
+
+function sign(value, notary::Notary, signer::Key)
+    signature = DSASignature(hash("$value", notary), signer)
+    signaturedict = Dict(signature) 
+    return signaturedict
+end
+
+### Perhaps I could use certify
+sign(value, signer::Signer) = sign(value, signer.notary, signer.key)
+
+function verify(value, signature::Dict, crypto::Notary)
+    signature = DSASignature{BigInt}(signature)
+    return CryptoSignatures.verify(signature,crypto.G) && signature.hash==hash("$value", crypto)    
+end
+
+id(s::Dict, crypto::Notary) = hash(string(parse(BigInt,s["pub"],base=16)), crypto) 
+id(s::Signer) = hash("$(s.key.pubkey)", s.notary)
+
+
+struct CypherSuite
+    notary::Notary
+end
+
+
+function fold(value::BigInt, signature::Dict)
+    dict = Dict("value"=>string(value, base=16),"signature"=>signature)
+    io = IOBuffer()
+    TOML.print(io,dict)
+    return take!(io)
+end
+
+function unfold(envelope::Vector{UInt8})
+    dict = TOML.parse(String(copy(envelope)))
+    value = parse(BigInt,dict["value"], base=16)
+    signature = dict["signature"]
+    return value, signature
+end
+
+
+function seal(value::BigInt, signer::Signer)
+    signature = sign(value, signer)
+    return fold(value, signature)
+end
+
+function unseal(envelope::Vector{UInt8}, crypto::Notary)
+    value, signature = unfold(envelope)
+
+    if verify(value, signature, crypto) ### The id is of ID type thus there shall be no problem
+        return value, id(signature, crypto)
+    else
+        return value, nothing
+    end
+end
+
+function seal(value::BigInt)
+    str = string(value, base=16)
+    return Vector{UInt8}(str)
+end
+
+function unseal(envelope::Vector{UInt8})
+    value = parse(BigInt,String(copy(envelope)),base=16)
+    return value, nothing
+end
 
 
 function rngint(len::Integer)
@@ -23,29 +100,46 @@ function rngint(len::Integer)
     return rand(1:max_n)
 end
 
+# Where did I need this hack?
+import Base.in
+in(x::Nothing,y::Nothing) = true
 
-function Notary(::Type{ThisCypherSuite},config::Symbol)
 
-    G = CryptoGroups.Scep256k1Group()
-    hash(x::AbstractString) = parse(BigInt,Nettle.hexdigest("sha256",x),base=16)
+function secure(socket::IO, crypto::CypherSuite, signer::Signer, id)
+    G = crypto.notary.G
 
-    Signer() = CryptoSignatures.Signer(G)
-    Signer(x::Dict) = CryptoSignatures.Signer{BigInt}(x,G)
-    Signature(x::Dict) = CryptoSignatures.DSASignature{BigInt}(x)
-    Signature(x::AbstractString,signer) = CryptoSignatures.DSASignature(hash(x),signer)
-    verify(data,signature) = CryptoSignatures.verify(signature,G) && hash(data)==signature.hash ? ID(hash("$(signature.pubkey)")) : nothing
+    dh = DH(value->seal(value,signer),envelope->unseal(envelope,crypto.notary),G,(x,y,z)->seal(hash("$x $y $z",crypto.notary)),() -> rngint(100))
 
-    return Notary(Signer,Signature,verify,hash)
+    key, idr = diffiehellman(socket, dh)
+    @assert idr in id "$idr not in $id"
+    securesocket = SecureSocket(socket, key)
+    return securesocket
 end
 
-function Cypher(::Type{ThisCypherSuite},config::Symbol)
-    G = CryptoGroups.Scep256k1Group()
-    rng() = rngint(100)
-    secureio(socket,key) = SecureSocket(socket,key)
+function secure(socket::IO, crypto::CypherSuite, signer::Signer)
+    G = crypto.notary.G
+    
+    dh = DH(value->seal(value,signer),envelope->unseal(envelope),G,(x,y,z)->seal(hash("$x $y $z",crypto.notary)),() -> rngint(100))
 
-    return Cypher(G,rng,secureio)
+    key, idr = diffiehellman(socket, dh)
+    securesocket = SecureSocket(socket, key)
+    return securesocket
 end
 
-export Notary, Cypher
+
+function secure(socket::IO, crypto::CypherSuite, id)
+    G = crypto.notary.G
+
+    dh = DH(value->seal(value),envelope->unseal(envelope,crypto.notary),G,(x,y,z)->seal(hash("$x $y $z",crypto.notary)),() -> rngint(100))
+
+    key, idr = diffiehellman(socket, dh)
+    @assert idr in id "$idr not in $id"
+    securesocket = SecureSocket(socket, key)
+    return securesocket
+end
+
+export Notary, hash, verify, newsigner, id
+export Signer, sign
+export CypherSuite, secure
 
 end # module

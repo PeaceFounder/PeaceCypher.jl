@@ -1,27 +1,37 @@
+using Sockets
+
+import PeaceCypher: sign
 using PeaceCypher
-using DemeNet.Plugins: uuid
-using DemeNet: CypherSuite, Notary
 
-cypher = uuid(:PeaceCypher)
+### Testing Notary
 
-notary = Notary(CypherSuite(cypher),:default)
+notary = Notary()
+signer = newsigner(notary)
 
-signer = notary.Signer()
+value = 19
+signature = sign(value, signer)
 
-msg = "Hello World"
-signature = notary.Signature(msg,signer)
-@show notary.verify(msg,signature)
+@show verify(value, signature, notary)
+@show id(signer)==id(signature, notary)
 
-cypher = Cypher(CypherSuite(cypher),:default)
+### Testing CypherSuite
 
-@show cypher.G
-@show cypher.rng()
+crypto = CypherSuite(notary)
 
-io = IOBuffer()
-secureio = cypher.secureio(io,24235235)
-write(secureio,b"hello")
-take!(io)
+master = newsigner(crypto.notary)
+masterid = id(master)
 
-@show notary.Signature(Dict(signature)) == signature
-@show notary.Signer(Dict(signer)) == signer
+port = 2019
+
+server = listen(port)
+
+@sync begin
+    @async begin 
+        masters = accept(server)
+        masterss = secure(masters, crypto, master)
+    end
+    sleep(1.)
+    slave = connect(port)
+    @show slavess = secure(slave, crypto, masterid)
+end
 
