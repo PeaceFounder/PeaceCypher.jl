@@ -11,8 +11,8 @@ signer = newsigner(notary)
 value = 19
 signature = sign(value, signer)
 
-@show verify(value, signature, notary)
-@show id(signer)==id(signature, notary)
+@show verify(value, signature)
+@show id(signer)==id(signature)
 
 ### Testing CypherSuite
 

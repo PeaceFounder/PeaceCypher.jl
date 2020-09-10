@@ -15,9 +15,29 @@ end
 const Key = CryptoSignatures.Signer
 
 struct Signer
-    notary::Notary
     key::Key
+    notary::Notary
 end
+
+# This should allow to improve notation in the future if necessary
+struct Signature
+    sig::Dict
+    notary::Notary
+end
+
+Base.Dict(s::Signature) = s.sig
+
+function binary(s::Signature)
+    io = IOBuffer()
+    TOML.print(io,Dict(s))
+    return take!(io)
+end
+
+function Signature(binary::Vector{UInt8}, notary::Notary)  
+    dict = TOML.parse(String(copy(binary)))
+    return Signature(dict, notary)
+end
+
 
 Notary() = Notary(CryptoGroups.Scep256k1Group())
 
@@ -25,12 +45,12 @@ hash(x::AbstractString, crypto::Notary) = BigInt(Base.hash(x))
 hash(x, crypto::Notary) = hash(string(x), crypto)
 
 
-newsigner(crypto::Notary) = Signer(crypto,Key(crypto.G))
+newsigner(crypto::Notary) = Signer(Key(crypto.G),crypto)
 
 function sign(value, notary::Notary, signer::Key)
-    signature = DSASignature(hash("$value", notary), signer)
+    signature = DSASignature(hash(value, notary), signer)
     signaturedict = Dict(signature) 
-    return signaturedict
+    return Signature(signaturedict, notary)
 end
 
 ### Perhaps I could use certify
@@ -38,10 +58,13 @@ sign(value, signer::Signer) = sign(value, signer.notary, signer.key)
 
 function verify(value, signature::Dict, crypto::Notary)
     signature = DSASignature{BigInt}(signature)
-    return CryptoSignatures.verify(signature,crypto.G) && signature.hash==hash("$value", crypto)    
+    return CryptoSignatures.verify(signature,crypto.G) && signature.hash==hash(value, crypto)    
 end
 
+verify(value, s::Signature) = verify(value, s.sig, s.notary)
+
 id(s::Dict, crypto::Notary) = hash(string(parse(BigInt,s["pub"],base=16)), crypto) 
+id(s::Signature) = id(s.sig, s.notary)
 id(s::Signer) = hash("$(s.key.pubkey)", s.notary)
 
 
@@ -67,14 +90,15 @@ end
 
 function seal(value::BigInt, signer::Signer)
     signature = sign(value, signer)
-    return fold(value, signature)
+    return fold(value, Dict(signature))
 end
 
 function unseal(envelope::Vector{UInt8}, crypto::Notary)
-    value, signature = unfold(envelope)
+    value, sdict = unfold(envelope)
+    signature = Signature(sdict, crypto)
 
-    if verify(value, signature, crypto) ### The id is of ID type thus there shall be no problem
-        return value, id(signature, crypto)
+    if verify(value, signature) ### The id is of ID type thus there shall be no problem
+        return value, id(signature)
     else
         return value, nothing
     end
@@ -140,6 +164,7 @@ end
 
 export Notary, hash, verify, newsigner, id
 export Signer, sign
+export Signature, binary, verify, id # Dict
 export CypherSuite, secure
 
 end # module
