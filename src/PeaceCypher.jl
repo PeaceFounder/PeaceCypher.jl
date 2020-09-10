@@ -8,7 +8,14 @@ using SecureIO
 using Nettle
 using Pkg.TOML
 
-struct Notary
+### I could promote Notary and CypherSuite as abstract types. 
+
+abstract type Notary end
+abstract type CypherSuite end
+abstract type Layer end
+
+
+struct CryptoNotary <: Notary
     G::AbstractGroup
 end
 
@@ -38,16 +45,17 @@ function Signature(binary::Vector{UInt8}, notary::Notary)
     return Signature(dict, notary)
 end
 
+### In future Notary shall accept configuration intialize it from that
+Notary() = CryptoNotary(CryptoGroups.Scep256k1Group())
 
-Notary() = Notary(CryptoGroups.Scep256k1Group())
-
-hash(x::AbstractString, crypto::Notary) = BigInt(Base.hash(x))
+### Some arbitrary defaults
+hash(x::AbstractString, crypto::CryptoNotary) = BigInt(Base.hash(x))
 hash(x, crypto::Notary) = hash(string(x), crypto)
 
 
-newsigner(crypto::Notary) = Signer(Key(crypto.G),crypto)
+newsigner(crypto::CryptoNotary) = Signer(Key(crypto.G),crypto)
 
-function sign(value, notary::Notary, signer::Key)
+function sign(value, notary::CryptoNotary, signer::Key)
     signature = DSASignature(hash(value, notary), signer)
     signaturedict = Dict(signature) 
     return Signature(signaturedict, notary)
@@ -56,21 +64,23 @@ end
 ### Perhaps I could use certify
 sign(value, signer::Signer) = sign(value, signer.notary, signer.key)
 
-function verify(value, signature::Dict, crypto::Notary)
+function verify(value, signature::Dict, crypto::CryptoNotary)
     signature = DSASignature{BigInt}(signature)
     return CryptoSignatures.verify(signature,crypto.G) && signature.hash==hash(value, crypto)    
 end
 
 verify(value, s::Signature) = verify(value, s.sig, s.notary)
 
-id(s::Dict, crypto::Notary) = hash(string(parse(BigInt,s["pub"],base=16)), crypto) 
+id(s::Dict, crypto::CryptoNotary) = hash(string(parse(BigInt,s["pub"],base=16)), crypto) 
 id(s::Signature) = id(s.sig, s.notary)
 id(s::Signer) = hash("$(s.key.pubkey)", s.notary)
 
-
-struct CypherSuite
+struct DiffieHellmanMerkle <: CypherSuite
     notary::Notary
 end
+
+### Again in future the correct cypher suite would be choosen uppon the passed configuration in Dict form which one could easally parse from a TOML file.
+CypherSuite(notary::Notary) = DiffieHellmanMerkle(notary)
 
 
 function fold(value::BigInt, signature::Dict)
@@ -129,7 +139,7 @@ import Base.in
 in(x::Nothing,y::Nothing) = true
 
 
-function secure(socket::IO, crypto::CypherSuite, signer::Signer, id)
+function secure(socket::IO, crypto::DiffieHellmanMerkle, signer::Signer, id)
     G = crypto.notary.G
 
     dh = DH(value->seal(value,signer),envelope->unseal(envelope,crypto.notary),G,(x,y,z)->seal(hash("$x $y $z",crypto.notary)),() -> rngint(100))
@@ -140,7 +150,7 @@ function secure(socket::IO, crypto::CypherSuite, signer::Signer, id)
     return securesocket
 end
 
-function secure(socket::IO, crypto::CypherSuite, signer::Signer)
+function secure(socket::IO, crypto::DiffieHellmanMerkle, signer::Signer)
     G = crypto.notary.G
     
     dh = DH(value->seal(value,signer),envelope->unseal(envelope),G,(x,y,z)->seal(hash("$x $y $z",crypto.notary)),() -> rngint(100))
@@ -151,7 +161,7 @@ function secure(socket::IO, crypto::CypherSuite, signer::Signer)
 end
 
 
-function secure(socket::IO, crypto::CypherSuite, id)
+function secure(socket::IO, crypto::DiffieHellmanMerkle, id)
     G = crypto.notary.G
 
     dh = DH(value->seal(value),envelope->unseal(envelope,crypto.notary),G,(x,y,z)->seal(hash("$x $y $z",crypto.notary)),() -> rngint(100))
@@ -162,9 +172,34 @@ function secure(socket::IO, crypto::CypherSuite, id)
     return securesocket
 end
 
+
+struct SecureLayerSymmetric <: Layer
+    crypto::CypherSuite
+    signer::Signer
+    id
+end
+
+struct SecureLayerMaster <: Layer
+    crypto::CypherSuite
+    signer::Signer
+end
+
+struct SecureLayerSlave <: Layer
+    crypto::CypherSuite
+    id
+end
+
+Layer(crypto::CypherSuite, signer::Signer, id) = SecureLayerSymmetric(crypto, signer, id)
+Layer(crypto::CypherSuite, signer::Signer) = SecureLayerMaster(crypto, signer)
+Layer(crypto::CypherSuite, id) = SecureLayerSlave(crypto, id)
+
+secure(socket::IO, sc::SecureLayerSymmetric) = secure(socket, sc.crypto, sc.signer, sc.id)
+secure(socket::IO, sc::SecureLayerMaster) = secure(socket, sc.crypto, sc.signer)
+secure(socket::IO, sc::SecureLayerSlave) = secure(socket, sc.crypto, sc.id)
+
 export Notary, hash, verify, newsigner, id
 export Signer, sign
 export Signature, binary, verify, id # Dict
-export CypherSuite, secure
+export CypherSuite, Layer, secure
 
 end # module
