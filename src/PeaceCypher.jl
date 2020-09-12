@@ -64,6 +64,11 @@ end
 ### Perhaps I could use certify
 sign(value, signer::Signer) = sign(value, signer.notary, signer.key)
 
+# In a real life we are willing to sacrifice some conviniance for security in fear of bugs. That could be achevead by typing the value and adding validation checks with methods for CryptoNotary. For example the program asks to sign DHParameter(a, G^a) where the sign method first would validate G^a=G^a. Similalry a validation check could be done on the Braid, but that must be done in the context of braid method. 
+
+
+
+
 function verify(value, signature::Dict, crypto::CryptoNotary)
     signature = DSASignature{BigInt}(signature)
     return CryptoSignatures.verify(signature,crypto.G) && signature.hash==hash(value, crypto)    
@@ -173,18 +178,61 @@ function secure(socket::IO, crypto::DiffieHellmanMerkle, id)
 end
 
 
-struct SecureLayerSymmetric <: Layer
+abstract type KeyParameter end
+
+
+mutable struct DHM <: KeyParameter
+    a
+    # tbegin
+    # tend
+    A
+end
+
+
+mutable struct Secret
+    cs::CypherSuite
+    par::KeyParameter
+    signature::Signature
+end
+
+### This is a DIffie-Hellman-Merkel authentificated secret
+
+# This method shall generate a secret for the cypher suite which, for example, could be done on aproval basis occasionly.
+function Secret(cs::CypherSuite, signer::Signer)
+    return nothing
+end
+
+# This method updates the layer with 
+function update!(secret::Secret, signer::Signer) ### Could use parametric types to be more precise
+    return nothing
+end
+
+function update!(secret::Secret, par::KeyParameter, signature::Signature)
+    secret.par = par
+    secret.signature = signature
+end
+
+
+
+### It is undesirable to expose the signer with in the protocol as that could in principle could be used to perform a timing attack. Instead we could generate a secret with authetification like
+# secret = generatesecret(cs::CypherSuite) 
+
+abstract type SymmetricLayer <: Layer end
+abstract type AsymmetricLayer <: Layer end
+
+
+struct SecureLayerSymmetric <: SymmetricLayer
     crypto::CypherSuite
-    signer::Signer
+    signer::Union{Signer,Secret}
     id
 end
 
-struct SecureLayerMaster <: Layer
+struct SecureLayerMaster <: AsymmetricLayer
     crypto::CypherSuite
-    signer::Signer
+    signer::Union{Signer,Secret}
 end
 
-struct SecureLayerSlave <: Layer
+struct SecureLayerSlave <: AsymmetricLayer
     crypto::CypherSuite
     id
 end
