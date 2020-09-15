@@ -10,6 +10,35 @@ using Pkg.TOML
 
 ### I could promote Notary and CypherSuite as abstract types. 
 
+struct ID#{T}
+    id::BigInt # ::T
+end
+
+function Base.string(id::ID; length=nothing, kwargs...) 
+    str = string(id.id; kwargs...)
+    if length!=nothing
+        len = Base.length(str)
+        @assert len<=length
+        pre = "0"^(length-len)        
+    else
+        pre = ""
+    end
+    return "$pre$str"
+end
+
+ID(str::AbstractString; kwargs...) = ID(parse(BigInt,str; kwargs...))
+
+Base.Dict(id::ID) = Dict("id"=>string(id,base=16))
+ID(dict::Dict) = ID(dict["id"],base=16)
+
+Base.Vector{UInt8}(id::ID; kwargs...) = Vector{UInt8}(string(id; kwargs...))
+ID(bytes::Vector{UInt8}; kwargs...) = ID(String(copy(bytes)); kwargs...)
+
+Base.:(==)(a::ID,b::ID) = a.id==b.id
+Base.hash(a::ID,h::UInt) = hash(a.id,hash(:ID,h))
+Base.in(a::ID,b::ID) = a==b
+
+
 abstract type Notary end
 abstract type CypherSuite end
 abstract type Layer end
@@ -76,9 +105,9 @@ end
 
 verify(value, s::Signature) = verify(value, s.sig, s.notary)
 
-id(s::Dict, crypto::CryptoNotary) = hash(string(parse(BigInt,s["pub"],base=16)), crypto) 
+id(s::Dict, crypto::CryptoNotary) = ID(hash(string(parse(BigInt,s["pub"],base=16)), crypto))
 id(s::Signature) = id(s.sig, s.notary)
-id(s::Signer) = hash("$(s.key.pubkey)", s.notary)
+id(s::Signer) = ID(hash("$(s.key.pubkey)", s.notary))
 
 struct DiffieHellmanMerkle <: CypherSuite
     notary::Notary
@@ -245,7 +274,7 @@ secure(socket::IO, sc::SecureLayerSymmetric) = secure(socket, sc.crypto, sc.sign
 secure(socket::IO, sc::SecureLayerMaster) = secure(socket, sc.crypto, sc.signer)
 secure(socket::IO, sc::SecureLayerSlave) = secure(socket, sc.crypto, sc.id)
 
-export Notary, hash, verify, newsigner, id
+export Notary, hash, verify, newsigner, id, ID
 export Signer, sign
 export Signature, binary, verify, id # Dict
 export CypherSuite, Layer, secure
