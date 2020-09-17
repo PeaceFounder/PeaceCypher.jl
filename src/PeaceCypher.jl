@@ -10,6 +10,7 @@ using Pkg.TOML
 
 ### I could promote Notary and CypherSuite as abstract types. 
 
+
 struct ID#{T}
     id::BigInt # ::T
 end
@@ -35,8 +36,10 @@ Base.Vector{UInt8}(id::ID; kwargs...) = Vector{UInt8}(string(id; kwargs...))
 ID(bytes::Vector{UInt8}; kwargs...) = ID(String(copy(bytes)); kwargs...)
 
 Base.:(==)(a::ID,b::ID) = a.id==b.id
-Base.hash(a::ID,h::UInt) = hash(a.id,hash(:ID,h))
+Base.hash(a::ID,h::UInt) = Base.hash(a.id, Base.hash(:ID,h))
 Base.in(a::ID,b::ID) = a==b
+
+
 
 
 abstract type Notary end
@@ -94,7 +97,6 @@ end
 sign(value, signer::Signer) = sign(value, signer.notary, signer.key)
 
 # In a real life we are willing to sacrifice some conviniance for security in fear of bugs. That could be achevead by typing the value and adding validation checks with methods for CryptoNotary. For example the program asks to sign DHParameter(a, G^a) where the sign method first would validate G^a=G^a. Similalry a validation check could be done on the Braid, but that must be done in the context of braid method. 
-
 
 
 
